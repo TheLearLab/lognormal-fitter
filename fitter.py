@@ -6,11 +6,10 @@ Created on Mon Apr 24 19:34:58 2023
 @author: benjaminlear
 """
 import numpy as np
-import plotly
 from pathlib import Path
-import PySimpleGUI as sg
 from lmfit import Model
 import itertools
+from matplotlib import pyplot as plt
 
 #define the models we want to use...
 def scaled_log_norm(x, A, mu, sd):
@@ -52,9 +51,15 @@ def value_and_error(value, error):
 ln_model = Model(scaled_log_norm)
 
 
-# identify the files you wish to fit and the place you want to save them at
+'''This will use pysimplegui to get a list of files that can be fit
+import PySimpleGUI as sg
 filenames = sg.popup_get_file("Choose files", multiple_files = True, file_types = '*.csv').split(";")
-#filenames = ["/Users/benjaminlear/My Drive/PennState/Research/Manuscripts/2019/Santina+Vadim/Silver/TEM/AgSC12NP 06152017.csv"]
+'''
+
+# if you want, you can use the following: and you can create a list of files, each separated by a comma
+filenames = [
+    "/Users/benjaminlear/My Drive/PennState/Research/Manuscripts/2019/Santina+Vadim/Silver/TEM/AgSC12NP 06152017.csv"
+    ]
 
 
 for data_file in filenames:
@@ -93,12 +98,39 @@ for data_file in filenames:
     result = ln_model.fit(y_density, x = x_bins, A = 1, mu = ln_mean, sd = ln_sd, method = "leastsq")
     print(result.fit_report())
     
+    x_sim = np.linspace(0.001, np.max(lengths)* 1.1, 1000)
+
+
+
+    
+    plt.bar(x_bins, y_density, edgecolor='white', width=h_bin, color = "#d36027")
+    plt.plot(x_sim, scaled_log_norm(x_sim, result.best_values["A"], result.best_values["mu"], result.best_values["sd"]), color = "black", linewidth = 3)
+    plt.title(data_file.stem)
+    plt.xlabel("diameter /nm")
+    plt.ylabel("density")
+    plt.xlim(0, max(x_bins) * 1.1)
+    plt.ylim(0, max(y_density) * 1.1)
+    plt.text(max(x_bins) * 1.05, max(y_density) * 1.05, 
+             f"$\mu$ = {value_and_error(result.params['mu'].value, result.params['mu'].stderr)} nm \n $\sigma$ = {value_and_error(result.params['sd'].value, result.params['sd'].stderr)} nm",
+             horizontalalignment = "right",
+             verticalalignment = "top",
+             color = "black"
+             )
+    plt.savefig(data_file.with_suffix('.fit.png'))
+    plt.show()
+    
+    
+    
+    ''' PLOTLY BASED PLOTTING --- NOT WORKING YET ON PC.
+    import kaleido
+    import plotly
     #plot the data
     fig = plotly.graph_objects.Figure( #make a figure, specifying default layouts
-        layout = dict(
-            template = "simple_white", 
-            colorway = plotly.colors.qualitative.Dark2,
-            showlegend = False,
+            layout = dict(
+                title=str(data_file.stem),
+                template = "simple_white", 
+                colorway = plotly.colors.qualitative.Dark2,
+                showlegend = False,
             xaxis = dict(
                 title = "size /nm", 
                 range = [0, np.max(lengths) * 1.1]
@@ -110,7 +142,6 @@ for data_file in filenames:
             )
         )
     
-    x_sim = np.linspace(0.001, np.max(lengths)* 1.1, 1000)
     
     fig.add_bar(x = x_bins, y = y_density, width = h_bin) # add the data trace to the figure
     fig.add_scatter(x = x_sim, 
@@ -148,6 +179,9 @@ for data_file in filenames:
             )
     fig.show('svg') # this one will be viewable in spyder
     fig.write_image(data_file.with_suffix('.fit.png')) #write image
+    '''
+    
+    
     
     # write the final stuff to a file    
     g_mu = np.exp(result.params['mu'].value)
